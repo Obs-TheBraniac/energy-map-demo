@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <div class="app">
@@ -55,31 +55,54 @@
       <div class="stats" id="p-stats"></div>
     </section>
 
-    <section>
+    <section data-show="solar wind">
+      <h2 id="res-title">Solar resource</h2>
+      <div class="lbl"><span id="hist-label">Spread across cells</span><span class="muted" id="hist-note"></span></div>
+      <div class="hist" id="hist"></div>
+      <div class="ramp-l muted" id="hist-axis"></div>
+      <div class="vs" id="res-vs"></div>
+      <h2 style="margin-top:18px">Strongest countries <span class="tier ph">placeholder outside UK</span></h2>
+      <ol class="toplist" id="res-top"></ol>
+      <p class="note" id="res-note"></p>
+    </section>
+
+    <section data-show="jobs">
+      <h2>Jobs per TWh by technology <span class="tier ph">placeholder factors</span></h2>
+      <ol class="toplist" id="jobs-tech"></ol>
+      <p class="note">Construction job-years needed to build enough capacity for one TWh a year in this place. Low capacity factors mean more capacity per TWh, which means more jobs.</p>
+    </section>
+
+    <section data-show="tier">
+      <h2>Modelling tiers here</h2>
+      <ol class="tiers" id="tiers"></ol>
+      <div id="sites"></div>
+    </section>
+
+    <section data-show="best">
       <h2>Technology ranking</h2>
       <ol class="rank" id="rank"></ol>
       <p class="note">Bar length is the weighted score. The range shows LCOE under low and high capital cost cases. LCOE in £/MWh, 2023 prices, firming cost included.</p>
     </section>
 
-    <section>
+    <section data-show="best">
       <h2>Criteria</h2>
       <div class="wrap-x"><table class="matrix" id="matrix"></table></div>
       <div class="weights" id="weights"></div>
     </section>
 
-    <section>
+    <section data-show="wind tier">
       <h2>Hourly dispatch, sample day <span class="tier ph">Tier B · not yet run</span></h2>
       <canvas class="chart" id="dispatch"></canvas>
       <div class="readout" id="readout"></div>
     </section>
 
-    <section>
+    <section data-show="best tier">
       <h2>Screening against optimisation</h2>
       <div class="cmp" id="cmp"></div>
       <p class="note" id="cmp-note"></p>
     </section>
 
-    <section>
+    <section data-show="jobs">
       <h2>Economic impact <span class="tier ph">Layer 5 · placeholder factors</span></h2>
       <div class="slider"><label for="s-twh">New generation to build</label><output id="o-twh"></output><input type="range" id="s-twh" min="5" max="200" step="5"></div>
       <div class="slider"><label for="s-local">Local content share</label><output id="o-local"></output><input type="range" id="s-local" min="10" max="90" step="5"></div>
@@ -88,10 +111,10 @@
         <div><div class="lbl"><span>Construction jobs by technology</span></div><div class="stack" id="jobstack"></div></div>
         <div><div class="lbl"><span>Investment by technology</span></div><div class="stack" id="invstack"></div></div>
       </div>
-      <p class="note">The mix comes from the screening ranking above. Job and GDP numbers use multipliers from published studies, still to be sourced (IRENA and others). CO₂ avoided is measured against the region's current fossil baseline.</p>
+      <p class="note">The mix comes from the weighted screening ranking (see the Cheapest technology tab). Job and GDP numbers use multipliers from published studies, still to be sourced (IRENA and others). CO₂ avoided is measured against the region's current fossil baseline.</p>
     </section>
 
-    <section>
+    <section data-show="tier none">
       <h2>Build plan</h2>
       <ol class="road">
         <li><span class="ln">L1</span><span>Data and screening (resource, LCOE, exclusions)</span><span class="st now">in progress</span></li>
@@ -109,6 +132,6 @@
 <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

@@ -289,12 +289,7 @@ function update(){
   const tier=$('p-tier');
   tier.className='tier '+(R.tier==='c'?'c':'a');
   tier.textContent = selectedCell ? 'Single cell · Tier A' : R.tier==='c' ? 'Tiers A · B · C' : 'Tier A screening';
-  let extra;
-  if(selectedId===826){
-    const uk = CELLS.filter(c=>c.cid===826);
-    extra = ['Solar cheapest', Math.round(uk.filter(c=>lcoe('solar',c.R)<lcoe('onshore',c.R)).length/uk.length*100)+'% of cells'];
-  } else extra = ['Cost of capital', S.wacc.toFixed(1)+'%'];
-  $('p-stats').innerHTML = [['Solar CF', R.solarCF.toFixed(3)], ['Wind CF', R.windCF.toFixed(3)], extra]
+  $('p-stats').innerHTML = statsFor(R)
     .map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
   $('rank').innerHTML = rows.map((r,i)=>{
     const t=TECH[r.k], real=R.real[r.k];
@@ -317,7 +312,84 @@ function update(){
     ? 'A per-cell ranking is not an energy mix. The gap between these two bars is the point of the comparison view.'
     : 'Full optimisation covers the UK first, then Nigeria. Other countries get screening only.';
   economics(R, scr);
+  renderTab(R);
   legend();
+}
+
+/* ---------- tab-specific side panel ---------- */
+const TIERB_NAMES = ['Central Scotland','South Yorkshire','Mid Wales','East Anglia','Northern Ireland','Lagos','Abuja','Kano','Maiduguri','Niger Delta'];
+const gbp = v=> v==null ? 'n/a' : '£'+Math.round(v);
+const sitesIn = id=> tierB.map((p,i)=>({p,name:TIERB_NAMES[i]})).filter(s=>d3.geoContains(byId.get(id),s.p));
+function statsFor(R){
+  const cheap = cheapest(R);
+  switch(layer){
+    case 'solar': return [['Solar CF',R.solarCF.toFixed(3)],['Annual yield',n0(R.solarCF*8760)+' kWh/kWp'],['Solar LCOE',gbp(lcoe('solar',R))+'/MWh']];
+    case 'wind': return [['Onshore CF',R.windCF.toFixed(3)],['Offshore CF',R.offCF?R.offCF.toFixed(3):'n/a'],['Onshore LCOE',gbp(lcoe('onshore',R))+'/MWh']];
+    case 'jobs': return [['Cheapest option',TECH[cheap].name],['Build jobs per TWh',n0(jobsPerTWh(cheap,R))],['Permanent per TWh',n0(JOBS[cheap][1]*1000/(8.76*cfOf(cheap,R)))]];
+    case 'tier': return [['Screening','Yes'],['Hourly sites',String(sitesIn(selectedId).length)],['Optimisation',R.tier==='c'?'Planned':'No']];
+    case 'none': return [['Solar CF',R.solarCF.toFixed(3)],['Wind CF',R.windCF.toFixed(3)],['Cost of capital',S.wacc.toFixed(1)+'%']];
+    default: {
+      if(selectedId===826){
+        const uk = CELLS.filter(c=>c.cid===826);
+        return [['Solar CF',R.solarCF.toFixed(3)],['Wind CF',R.windCF.toFixed(3)],['Solar cheapest',Math.round(uk.filter(c=>lcoe('solar',c.R)<lcoe('onshore',c.R)).length/uk.length*100)+'% of cells']];
+      }
+      return [['Solar CF',R.solarCF.toFixed(3)],['Wind CF',R.windCF.toFixed(3)],['Cost of capital',S.wacc.toFixed(1)+'%']];
+    }
+  }
+}
+function renderTab(R){
+  document.querySelectorAll('.rail section[data-show]').forEach(s=>{ s.hidden = !s.dataset.show.split(' ').includes(layer); });
+  if(layer==='solar'||layer==='wind') renderResource(R);
+  if(layer==='jobs') renderJobsTech(R);
+  if(layer==='tier') renderTiers(R);
+}
+function renderResource(R){
+  const solar = layer==='solar', key = solar?'solarCF':'windCF', tech = solar?'solar':'onshore', scale = solar?seqSolar:seqWind;
+  $('res-title').textContent = solar ? 'Solar resource' : 'Wind resource';
+  // histogram: cells if this country has them, otherwise all countries
+  const cells = CELLS.filter(c=>c.cid===selectedId);
+  const vals = cells.length ? cells.map(c=>c.R[key]) : countries.map(f=>regionOf.get(+f.id)[key]);
+  const here = selectedCell ? selectedCell.R[key] : R[key];
+  const lo = d3.min(vals), hi = d3.max(vals), nb = 22, w = (hi-lo)/nb || 1;
+  const bins = new Array(nb).fill(0); vals.forEach(v=>bins[Math.min(nb-1,Math.floor((v-lo)/w))]++);
+  const hb = Math.min(nb-1,Math.max(0,Math.floor((here-lo)/w))), mx = d3.max(bins);
+  $('hist').innerHTML = bins.map((b,i)=>`<div class="${i===hb?'here':''}" style="height:${Math.max(2,b/mx*100)}%;background:${scale(lo+(i+.5)*w)}" title="${(lo+i*w).toFixed(3)} to ${(lo+(i+1)*w).toFixed(3)}: ${b}"></div>`).join('');
+  $('hist-label').textContent = cells.length ? `Capacity factor across ${n0(cells.length)} cells` : 'Capacity factor across countries';
+  $('hist-note').textContent = cells.length ? `median ${d3.median(vals).toFixed(3)}` : 'cells only for UK and Nigeria';
+  $('hist-axis').innerHTML = `<span>${lo.toFixed(2)}</span><span>outlined bar = ${selectedCell?'this cell':'this place'}</span><span>${hi.toFixed(2)}</span>`;
+  // cost against the alternatives
+  const alts = available(R).map(k=>({k,v:lcoe(k,R)})).sort((a,b)=>a.v-b.v);
+  const show = [alts.find(a=>a.k===tech), ...alts.filter(a=>a.k!==tech).slice(0,4)].filter(Boolean).sort((a,b)=>a.v-b.v);
+  const vmax = d3.max(show,d=>d.v);
+  $('res-vs').innerHTML = `<div class="lbl"><span>${TECH[tech].name} against the cheapest alternatives</span><span>£/MWh</span></div>` +
+    show.map(a=>`<div class="row"><span style="${a.k===tech?'color:var(--ink);font-weight:600':''}">${TECH[a.k].name}</span><div class="b" style="width:${a.v/vmax*100}%;background:${TECH[a.k].color}"></div><span>${Math.round(a.v)}</span></div>`).join('');
+  // strongest countries
+  const ranked = countries.map(f=>({id:+f.id, name:regionOf.get(+f.id).name, v:regionOf.get(+f.id)[key]})).sort((a,b)=>b.v-a.v);
+  let list = ranked.slice(0,8).map((r,i)=>({...r,rank:i+1}));
+  const selRank = ranked.findIndex(r=>r.id===selectedId);
+  if(selRank>=8) list.push({...ranked[selRank], rank:selRank+1});
+  const top = ranked[0].v;
+  $('res-top').innerHTML = list.map(r=>`<li class="${r.id===selectedId?'sel':''}"><span class="n">${r.rank}</span><span class="nm">${r.name}</span><div class="b" style="width:${r.v/top*100}%;background:${scale(r.v)}"></div><span class="v">${r.v.toFixed(3)}</span></li>`).join('');
+  $('res-note').textContent = solar
+    ? (selectedId===826 ? 'UK value is the Layer 1 median from the Global Solar Atlas. ' : 'Value for this country is a placeholder until its data is processed. ') + 'Annual yield is capacity factor times 8,760 hours.'
+    : (selectedId===826 ? 'Layer 1 check: at 785 real UK wind farms the atlas gives a net capacity factor of 0.432, but the fleet achieved 0.245 (DUKES 2026). The atlas layers are gross, so real output is lower than the map suggests.' : 'Value for this country is a placeholder until the Global Wind Atlas data is processed.');
+}
+function renderJobsTech(R){
+  const rows = available(R).map(k=>({k, v:jobsPerTWh(k,R)})).sort((a,b)=>b.v-a.v), mx = rows[0].v;
+  $('jobs-tech').innerHTML = rows.map((r,i)=>`<li><span class="n">${i+1}</span><span class="nm"><i style="background:${TECH[r.k].color}"></i>${TECH[r.k].name}</span><div class="b" style="width:${r.v/mx*100}%;background:${TECH[r.k].color}"></div><span class="v">${n0(r.v)}</span></li>`).join('');
+}
+function renderTiers(R){
+  const c = R.tier==='c', uk = selectedId===826;
+  const T = [
+    ['a','A','Screening', 'Annual-average resource and costs per cell, computed live in your browser.', uk ? '1 km cells, Layer 1 in progress' : c ? '1 km cells planned' : 'Coarse country value, placeholder', true],
+    ['c','B','Hourly single-site model', 'One-node PyPSA runs with hourly wind, solar, demand and storage at sample sites.', c ? 'Planned, not run yet' : 'Not planned here', c],
+    ['c','C','Regional optimisation', 'PyPSA-Earth capacity expansion and dispatch with the transmission network.', uk ? 'First region' : c ? 'Second region' : 'Only the UK and Nigeria', c]
+  ];
+  $('tiers').innerHTML = T.map(([cls,l,name,desc,status,on])=>`<li class="${on?'':'off'}"><span class="tier ${on?cls:'ph'}">Tier ${l}</span><b>${name} · ${status}</b><span class="d">${desc}</span></li>`).join('');
+  const s = sitesIn(selectedId);
+  $('sites').innerHTML = `<h2 style="margin-top:18px">Hourly sample sites</h2>` + (s.length
+    ? `<ol class="sitelist">${s.map(x=>`<li><span>${x.name}</span><span>${fmtLL(x.p[0],x.p[1])}</span></li>`).join('')}</ol>`
+    : `<p class="note" style="margin-top:0">No hourly sample sites in this country.</p>`);
 }
 
 /* ---------- Layer 5: economic impact (placeholder multipliers) ---------- */
@@ -372,6 +444,7 @@ function legend(){
 
 document.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{
   layer=b.dataset.layer; document.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed', c===b));
+  $('rail').scrollTop = 0;
   applyLayerVisibility(); update();
 }));
 function setSpin(on){ spinning=on; $('spin').textContent= on?'Pause spin':'Spin'; $('spin').setAttribute('aria-pressed',on); }

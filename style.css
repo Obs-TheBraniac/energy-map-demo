@@ -110,6 +110,32 @@ canvas.chart{width:100%;height:150px;display:block}
 .econ .k{font-size:11px;color:var(--ink-3)}
 .econ .v{font-family:var(--f-mono);font-size:20px;font-variant-numeric:tabular-nums}
 .econ .u{font-size:11px;color:var(--ink-2);margin-left:3px}
+.lbl{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--ink-2);margin-bottom:4px}
+.hist{display:flex;align-items:flex-end;gap:2px;height:80px;margin-top:6px;border-bottom:1px solid var(--line)}
+.hist div{flex:1;min-width:0;border-radius:2px 2px 0 0;opacity:.85;transition:height .3s}
+.hist div.here{opacity:1;outline:1.5px solid var(--ink);outline-offset:1px}
+.vs{display:grid;gap:8px;margin-top:16px}
+.vs .row{display:grid;grid-template-columns:118px 1fr 70px;gap:8px;align-items:center;font-size:12px}
+.vs .row span:first-child{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vs .row span:last-child{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.vs .b{height:8px;border-radius:2px}
+.toplist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.toplist li{display:grid;grid-template-columns:18px 130px 1fr 54px;gap:8px;align-items:center;font-size:12px}
+.toplist li.sel{color:var(--ink);font-weight:600}
+.toplist .n{font-family:var(--f-mono);color:var(--ink-3);font-size:11px}
+.toplist .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;gap:6px;align-items:center}
+.toplist .nm i{width:9px;height:9px;border-radius:2px;flex:none}
+.toplist .b{height:7px;border-radius:2px}
+.toplist .v{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.tiers{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.tiers li{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12.5px}
+.tiers li .tier{grid-row:1/3;align-self:start}
+.tiers li b{font-weight:600}
+.tiers li span.d{color:var(--ink-3);font-size:11.5px}
+.tiers li.off{opacity:.45}
+.sitelist{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;font-size:12px}
+.sitelist li{display:flex;justify-content:space-between;gap:8px}
+.sitelist li span:last-child{font-family:var(--f-mono);color:var(--ink-3)}
 .road{list-style:none;padding:0;margin:0;display:grid;gap:7px}
 .road li{display:grid;grid-template-columns:22px 1fr auto;gap:8px;font-size:12.5px;align-items:baseline}
 .road .ln{font-family:var(--f-mono);color:var(--ink-3)}
