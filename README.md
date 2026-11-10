@@ -65,3 +65,10 @@ the site and the code.
   grid is 1 km).
 - Hourly dispatch, PyPSA mixes, job factors and all non-UK resource values
   are illustrative.
+
+## Updating the live site
+
+GitHub Pages tells browsers to cache files for 10 minutes. When you change
+`style.css` or `app.js`, bump the `?v=` number on their links in `index.html`
+so visitors get the new files straight away. After a push, a hard refresh
+(Ctrl+Shift+R) shows the new version on your own machine.
