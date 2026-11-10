@@ -47,7 +47,8 @@ header{grid-column:1/-1;display:flex;align-items:center;gap:18px;flex-wrap:wrap;
 .stagebtns button:hover{background:var(--line-soft);color:var(--ink)}
 .zoomv{font-family:var(--f-mono);font-size:11px;color:var(--ink-3);align-self:center;padding:0 8px}
 
-.tierb{width:7px;height:7px;border-radius:50%;background:var(--ink);border:1px solid var(--ground);position:relative;cursor:default}
+/* no position rule here: MapLibre positions markers with its own position:absolute */
+.tierb{width:7px;height:7px;border-radius:50%;background:var(--ink);border:1px solid var(--ground);cursor:default}
 .tierb::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-4px 0 0 -4px;border:1px solid var(--ink);border-radius:50%;animation:pulse 1.6s ease-out infinite}
 @keyframes pulse{from{transform:scale(1);opacity:.7}to{transform:scale(5);opacity:0}}
 @media (prefers-reduced-motion:reduce){.tierb::after{animation:none;opacity:0}}

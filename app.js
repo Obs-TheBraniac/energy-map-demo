@@ -90,13 +90,14 @@ function cheapest(R){ let best=null,bv=Infinity; for(const k of available(R)){co
 /* ---------- geography ---------- */
 const TOPO = await (await fetch('data/countries-110m.json')).json();
 const countries = topojson.feature(TOPO, TOPO.objects.countries).features.filter(f=>f.properties.name!=='Antarctica');
-countries.forEach(f=>{ f.properties.id = +f.id; });
+// a few areas (N. Cyprus, Somaliland, Kosovo) have no id in the source data; give them their own
+countries.forEach((f,i)=>{ if(f.id==null) f.id = String(9000+i); f.properties.id = +f.id; });
 // Copies of the shapes for drawing, with rings unwrapped across the dateline so
 // Russia and Fiji are not drawn the long way round the globe.
 function unwrapRing(ring){ let prev=ring[0][0]; return ring.map(([x,y],i)=>{ if(i){ while(x-prev>180) x-=360; while(x-prev<-180) x+=360; } prev=x; return [x,y]; }); }
 const drawFeatures = countries.map(f=>{
   const g=f.geometry, polys = g.type==='Polygon' ? [g.coordinates] : g.coordinates;
-  return {type:'Feature', properties:f.properties, geometry:{type:'MultiPolygon', coordinates:polys.map(p=>p.map(unwrapRing))}};
+  return {type:'Feature', id:+f.id, properties:{...f.properties}, geometry:{type:'MultiPolygon', coordinates:polys.map(p=>p.map(unwrapRing))}};
 });
 const regionOf = new Map(countries.map(f=>[+f.id, REGIONS[+f.id] || genericRegion(f)]));
 const byId = new Map(countries.map(f=>[+f.id,f]));
@@ -123,21 +124,40 @@ const seqWind  = d3.scaleSequential(d3.interpolateRgbBasis(['#1f2c48','#1f5f73',
 const seqJobs  = d3.scaleSequentialLog(d3.interpolateRgbBasis(['#2a2446','#5a3a7a','#a45ca8','#f0a0c8'])).domain([500,15000]).clamp(true);
 const jobsPerTWh = (k,R)=> JOBS[k][0]*1000/(8.76*cfOf(k,R));
 let layer='best';
-const toHex = c=> d3.color(c).formatHex();
-function colorFor(R,best){
-  if(layer==='best') return TECH[best].color;
-  if(layer==='solar') return toHex(seqSolar(R.solarCF));
-  if(layer==='wind') return toHex(seqWind(R.windCF));
-  if(layer==='jobs') return toHex(seqJobs(jobsPerTWh(best,R)));
-  if(layer==='tier') return R.tier==='c' ? css('--good') : '#2c3a58';
-  return '#000000';
-}
+const TECH_KEYS = Object.keys(TECH);
+// Static values (solar, wind, coverage) are stored once as feature properties.
+// Values that move with the sliders (cheapest technology, jobs) live in feature
+// state, so a slider move only touches the shapes whose answer changed and the
+// map never has to re-cut its tiles. Switching tabs only swaps a style rule.
+drawFeatures.forEach(f=>{ const R=regionOf.get(f.id); f.properties.s=R.solarCF; f.properties.w=R.windCF; f.properties.t=R.tier==='c'?1:0; });
 const countryFC = {type:'FeatureCollection', features:drawFeatures};
-const cellFC = {type:'FeatureCollection', features: CELLS.map((c,i)=>({type:'Feature', id:i, properties:{i},
+const cellFC = {type:'FeatureCollection', features: CELLS.map((c,i)=>({type:'Feature', id:i, properties:{i, s:c.R.solarCF, w:c.R.windCF, t:1},
   geometry:{type:'Polygon', coordinates:[[[c.x-c.sx/2,c.y-c.sy/2],[c.x+c.sx/2,c.y-c.sy/2],[c.x+c.sx/2,c.y+c.sy/2],[c.x-c.sx/2,c.y+c.sy/2],[c.x-c.sx/2,c.y-c.sy/2]]]}}))};
+const ramp = (prop, scale)=>{ const [a,b]=scale.domain(); const out=['interpolate',['linear'],prop];
+  for(let t=0;t<=1.0001;t+=.25){ out.push(a+t*(b-a), d3.color(scale(a+t*(b-a))).formatHex()); } return out; };
+const FILL = {
+  best: ['match',['coalesce',['feature-state','b'],-1], ...TECH_KEYS.flatMap((k,i)=>[i,TECH[k].color]), '#2c3a58'],
+  solar: ramp(['get','s'], seqSolar),
+  wind: ramp(['get','w'], seqWind),
+  jobs: ['interpolate',['linear'],['coalesce',['feature-state','j'],2.7],
+         ...[0,.25,.5,.75,1].flatMap(t=>{ const v=500*Math.pow(30,t); return [Math.log10(v), d3.color(seqJobs(v)).formatHex()]; })],
+  tier: ['case',['==',['get','t'],1], css('--good'), '#2c3a58'],
+  none: '#000000'
+};
+const lastState = new Map(); // "source:id" -> "best|jobs" last sent to the map
 function recolor(){
-  for(const f of countries){ const R=regionOf.get(+f.id); f.properties.best = cheapest(R); f.properties.c = colorFor(R, f.properties.best); }
-  CELLS.forEach((c,i)=>{ c.best = cheapest(c.R); cellFC.features[i].properties.c = colorFor(c.R, c.best); });
+  for(const f of countries){ f.properties.best = cheapest(regionOf.get(+f.id)); }
+  for(const c of CELLS) c.best = cheapest(c.R);
+}
+function pushState(){
+  if(!ready) return;
+  const send = (source,id,best,R)=>{
+    const b = TECH_KEYS.indexOf(best), j = Math.round(Math.log10(jobsPerTWh(best,R))*100)/100, key = source+':'+id, v = b+'|'+j;
+    if(lastState.get(key)===v) return;
+    lastState.set(key,v); map.setFeatureState({source, id},{b, j});
+  };
+  for(const f of countries) send('countries', +f.id, f.properties.best, regionOf.get(+f.id));
+  CELLS.forEach((c,i)=> send('cells', i, c.best, c.R));
 }
 
 /* ---------- map ---------- */
@@ -162,10 +182,10 @@ map.on('style.load', ()=>{
   map.addSource('countries',{type:'geojson', data:countryFC});
   map.addSource('cells',{type:'geojson', data:cellFC});
   map.addLayer({id:'countries-fill', type:'fill', source:'countries', paint:{
-    'fill-color':['get','c'],
+    'fill-color':FILL[layer],
     'fill-opacity':['interpolate',['linear'],['zoom'],0,.82,4,.7,6,.25,8,.08]}}, before);
   map.addLayer({id:'cells-fill', type:'fill', source:'cells', minzoom:3.5, paint:{
-    'fill-color':['get','c'],
+    'fill-color':FILL[layer],
     'fill-opacity':['interpolate',['linear'],['zoom'],3.5,0,4.5,.85,8,.65,10,.38,12,.26,15,.16]}}, before);
   map.addLayer({id:'cells-line', type:'line', source:'cells', minzoom:8, paint:{'line-color':'#0b1220','line-opacity':.35,'line-width':.6}}, before);
   map.addLayer({id:'cells-sel', type:'line', source:'cells', filter:['==',['get','i'],-1], paint:{'line-color':'#e6ecf6','line-width':2.2}});
@@ -175,13 +195,9 @@ map.on('style.load', ()=>{
   ready=true; applyLayerVisibility(); update();
 });
 
-let pendingData=false;
-function pushData(){
-  if(!ready || pendingData) return; pendingData=true;
-  requestAnimationFrame(()=>{ pendingData=false; map.getSource('countries').setData(countryFC); map.getSource('cells').setData(cellFC); });
-}
 function applyLayerVisibility(){
   if(!ready) return;
+  if(layer!=='none'){ map.setPaintProperty('countries-fill','fill-color',FILL[layer]); map.setPaintProperty('cells-fill','fill-color',FILL[layer]); }
   const vis = layer==='none' ? 'none' : 'visible';
   map.setLayoutProperty('countries-fill','visibility',vis);
   map.setLayoutProperty('cells-fill','visibility', layer==='none'||layer==='tier' ? 'none' : 'visible');
@@ -243,7 +259,7 @@ function flyToCountry(id){
 const sliders = {year:$('s-year'),wacc:$('s-wacc'),carbon:$('s-carbon'),gas:$('s-gas'),firm:$('s-firm'),twh:$('s-twh'),local:$('s-local')};
 const fmt = {year:v=>v, wacc:v=>(+v).toFixed(1)+'%', carbon:v=>'£'+v+'/t', gas:v=>'£'+v+'/MWh', firm:v=>v+'%', twh:v=>v+' TWh/yr', local:v=>v+'%'};
 function syncOutputs(){ for(const k in sliders){ sliders[k].value=S[k]; $('o-'+k).textContent=fmt[k](S[k]); } }
-for(const k in sliders) sliders[k].addEventListener('input',()=>{ S[k]=+sliders[k].value; $('o-'+k).textContent=fmt[k](S[k]); update(); });
+for(const k in sliders) sliders[k].addEventListener('input',()=>{ S[k]=+sliders[k].value; $('o-'+k).textContent=fmt[k](S[k]); scheduleUpdate(); });
 function regionDefaults(R){ S.wacc=R.wacc; S.carbon=R.carbon; S.gas=R.gas; S.twh=R.twh; S.local=R.local; syncOutputs(); }
 $('reset').addEventListener('click',()=>{ regionDefaults(regionOf.get(selectedId)); update(); });
 
@@ -259,9 +275,11 @@ function select(id, fly, cell=null){
   update();
 }
 
-let lastRows=[], lastR=null;
+let lastRows=[], lastR=null, updateQueued=false;
+// slider drags fire many input events; run at most one full update per frame
+function scheduleUpdate(){ if(updateQueued) return; updateQueued=true; requestAnimationFrame(()=>{ updateQueued=false; update(); }); }
 function update(){
-  recolor(); pushData();
+  recolor(); pushState();
   const R = selectedCell
     ? {...selectedCell.R, sub:`Cell ${fmtLL(selectedCell.x,selectedCell.y)} · about ${Math.round(selectedCell.sy*111)} km across · Reset view returns to the country`}
     : regionOf.get(selectedId);
@@ -364,7 +382,7 @@ $('home').addEventListener('click',()=>{
 });
 
 $('weights').innerHTML = CRITERIA.map(c=>`<div class="slider"><label for="w-${c}">${CRIT_LABEL[c]}</label><output id="ow-${c}">${weights[c]}</output><input type="range" id="w-${c}" min="0" max="5" step="1" value="${weights[c]}"></div>`).join('');
-CRITERIA.forEach(c=>$('w-'+c).addEventListener('input',e=>{weights[c]=+e.target.value; $('ow-'+c).textContent=weights[c]; update();}));
+CRITERIA.forEach(c=>$('w-'+c).addEventListener('input',e=>{weights[c]=+e.target.value; $('ow-'+c).textContent=weights[c]; scheduleUpdate();}));
 
 /* ---------- Tier B dispatch chart (illustrative) ---------- */
 const dc = $('dispatch'), dx = dc.getContext('2d');
