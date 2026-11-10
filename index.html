@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Energy Map</title>
+<meta name="description" content="Concept preview of an energy screening explorer: a globe with live scenario sliders, technology rankings and economic impact, over a real street map.">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><h1>Energy Map</h1><span>screening explorer</span></div>
+    <span class="concept">Concept preview. Most numbers are placeholders.</span>
+    <div class="layers" role="group" aria-label="Map layer">
+      <button class="chip" data-layer="best" aria-pressed="true">Cheapest technology</button>
+      <button class="chip" data-layer="solar" aria-pressed="false">Solar yield</button>
+      <button class="chip" data-layer="wind" aria-pressed="false">Wind capacity factor</button>
+      <button class="chip" data-layer="jobs" aria-pressed="false">Jobs potential</button>
+      <button class="chip" data-layer="tier" aria-pressed="false">Model coverage</button>
+      <button class="chip" data-layer="none" aria-pressed="false">Street map only</button>
+    </div>
+  </header>
+
+  <div class="stage" id="stage">
+    <div id="map" aria-label="Interactive globe map. Drag to rotate, scroll to zoom, click a country or cell to select it."></div>
+
+    <div class="float scenario" id="scenario">
+      <h2>Scenario</h2>
+      <div class="slider"><label for="s-year">Build year</label><output id="o-year"></output><input type="range" id="s-year" min="2025" max="2050" step="1"></div>
+      <div class="slider"><label for="s-wacc">Cost of capital</label><output id="o-wacc"></output><input type="range" id="s-wacc" min="2" max="18" step="0.5"></div>
+      <div class="slider"><label for="s-carbon">Carbon price</label><output id="o-carbon"></output><input type="range" id="s-carbon" min="0" max="200" step="5"></div>
+      <div class="slider"><label for="s-gas">Gas price</label><output id="o-gas"></output><input type="range" id="s-gas" min="5" max="90" step="1"></div>
+      <div class="slider"><label for="s-firm">Firm supply required</label><output id="o-firm"></output><input type="range" id="s-firm" min="0" max="100" step="5"></div>
+      <div class="row"><span class="muted">Applied to every cell on the map</span><button class="link" id="reset">Region defaults</button></div>
+    </div>
+
+    <div class="float legend" id="legend"></div>
+    <div class="float stagebtns">
+      <span class="zoomv" id="zoomv">z 1.5</span>
+      <button id="spin" aria-pressed="true">Pause spin</button>
+      <button id="home">Reset view</button>
+    </div>
+  </div>
+
+  <aside class="rail" id="rail">
+    <section>
+      <div class="place">
+        <div><h3 id="p-name">United Kingdom</h3><div class="sub" id="p-sub"></div></div>
+        <span class="tier" id="p-tier"></span>
+      </div>
+      <div class="stats" id="p-stats"></div>
+    </section>
+
+    <section>
+      <h2>Technology ranking</h2>
+      <ol class="rank" id="rank"></ol>
+      <p class="note">Bar length is the weighted score. The range shows LCOE under low and high capital cost cases. LCOE in £/MWh, 2023 prices, firming cost included.</p>
+    </section>
+
+    <section>
+      <h2>Criteria</h2>
+      <div class="wrap-x"><table class="matrix" id="matrix"></table></div>
+      <div class="weights" id="weights"></div>
+    </section>
+
+    <section>
+      <h2>Hourly dispatch, sample day <span class="tier ph">Tier B · not yet run</span></h2>
+      <canvas class="chart" id="dispatch"></canvas>
+      <div class="readout" id="readout"></div>
+    </section>
+
+    <section>
+      <h2>Screening against optimisation</h2>
+      <div class="cmp" id="cmp"></div>
+      <p class="note" id="cmp-note"></p>
+    </section>
+
+    <section>
+      <h2>Economic impact <span class="tier ph">Layer 5 · placeholder factors</span></h2>
+      <div class="slider"><label for="s-twh">New generation to build</label><output id="o-twh"></output><input type="range" id="s-twh" min="5" max="200" step="5"></div>
+      <div class="slider"><label for="s-local">Local content share</label><output id="o-local"></output><input type="range" id="s-local" min="10" max="90" step="5"></div>
+      <div class="econ" id="econ"></div>
+      <div class="cmp">
+        <div><div class="lbl"><span>Construction jobs by technology</span></div><div class="stack" id="jobstack"></div></div>
+        <div><div class="lbl"><span>Investment by technology</span></div><div class="stack" id="invstack"></div></div>
+      </div>
+      <p class="note">The mix comes from the screening ranking above. Job and GDP numbers use multipliers from published studies, still to be sourced (IRENA and others). CO₂ avoided is measured against the region's current fossil baseline.</p>
+    </section>
+
+    <section>
+      <h2>Build plan</h2>
+      <ol class="road">
+        <li><span class="ln">L1</span><span>Data and screening (resource, LCOE, exclusions)</span><span class="st now">in progress</span></li>
+        <li><span class="ln">L2</span><span>Globe with live layers, hover and click</span><span class="st">this preview</span></li>
+        <li><span class="ln">L3</span><span>Scenario sliders, weights, uncertainty bands</span><span class="st">this preview</span></li>
+        <li><span class="ln">L4</span><span>Tier B hourly runs, PyPSA-Earth regions</span><span class="st">planned</span></li>
+        <li><span class="ln">L5</span><span>Jobs and economic impact</span><span class="st">this preview</span></li>
+        <li><span class="ln">L6</span><span>Stylised 3D city builder</span><span class="st">stretch</span></li>
+      </ol>
+      <p class="note">Base map: OpenFreeMap, OpenMapTiles, OpenStreetMap contributors.</p>
+    </section>
+  </aside>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
