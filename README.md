@@ -15,13 +15,28 @@ Most numbers are placeholders. Only the UK solar and onshore wind capacity
 factors and the DESNZ-calibrated cost ranges come from the Layer 1 work in
 `C:\Users\omogb\Code\energy-map`. The page labels which is which.
 
+## What each layer of the brief looks like here
+
+| Layer | In the demo |
+|---|---|
+| 1. Data and screening | Cheapest option per cell for 12 technologies (storage included), editable cost assumptions and a data sources list under "Data and assumptions", an illustrative transmission grid toggle in the legend |
+| 2. Globe | MapLibre globe with six layer tabs, hover details, click a country or cell; "Why MapLibre" tab in the drawer |
+| 3. Scenarios | Five published-style presets, sliders for year, electrification, demand growth, costs and carbon price, history and projection chart with sources named |
+| 4. Real modelling | "Run PyPSA-Earth" in the Model coverage tab: a mock background run with a progress pill, solver log and results compared with screening |
+| 5. Economic impact | Jobs potential tab: investment, jobs, GDP, CO₂, and the same numbers under every scenario |
+| 6. City builder | "City view": a three.js city whose turbines, solar farms, plants, smog and day-night cycle follow the mix for the chosen year |
+
+Everything in Layers 3 to 6 is mocked to look and behave right. None of it
+runs a real model.
+
 ## Files
 
 | File | What it is |
 |---|---|
 | `index.html` | Page structure |
 | `style.css` | Look and layout |
-| `app.js` | Model, map layers, panel, charts |
+| `app.js` | Model, map layers, panel, charts, scenarios, mock optimisation |
+| `city.js` | 3D city view (three.js r128) |
 | `data/countries-110m.json` | Country shapes (Natural Earth via world-atlas 2.0.2) |
 | `serve.js` | Local preview server, not needed online |
 

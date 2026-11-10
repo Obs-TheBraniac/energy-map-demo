@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <div class="app">
@@ -23,14 +23,61 @@
       <button class="chip" data-layer="tier" aria-pressed="false">Model coverage</button>
       <button class="chip" data-layer="none" aria-pressed="false">Street map only</button>
     </div>
+    <div class="hdr-actions">
+      <button class="runpill" id="runpill" hidden></button>
+      <button class="hbtn" id="open-drawer">Data and assumptions</button>
+      <button class="hbtn primary" id="city-btn" aria-pressed="false">City view</button>
+    </div>
   </header>
 
   <div class="stage" id="stage">
     <div id="map" aria-label="Interactive globe map. Drag to rotate, scroll to zoom, click a country or cell to select it."></div>
 
+    <div class="city" id="city" hidden>
+      <canvas id="city-canvas" aria-label="Stylised 3D city whose power plants change with the energy mix. Drag to orbit, scroll to zoom."></canvas>
+      <div class="city-hud">
+        <div class="city-title"><span class="eyebrow">Layer 6 · city builder</span><h3 id="city-name">Leeds</h3><div class="muted" id="city-sub"></div></div>
+        <div class="stack" id="city-mix"></div>
+        <div class="city-stats" id="city-stats"></div>
+        <div class="city-legend" id="city-legend"></div>
+      </div>
+      <div class="city-ctrl">
+        <span class="muted" id="city-clock">12:00</span>
+        <button id="city-pause">Pause time</button>
+        <button id="city-back">Back to map</button>
+      </div>
+      <p class="city-hint muted">Drag to orbit · scroll to zoom · move the Build year slider to watch the city change</p>
+    </div>
+
+    <div class="drawer" id="drawer" hidden>
+      <div class="drawer-head">
+        <div class="tabs" role="tablist">
+          <button class="tab" data-dtab="assume" aria-selected="true">Assumptions</button>
+          <button class="tab" data-dtab="sources" aria-selected="false">Data sources</button>
+          <button class="tab" data-dtab="about" aria-selected="false">Why MapLibre</button>
+        </div>
+        <button class="link" id="close-drawer">Close</button>
+      </div>
+      <div class="drawer-body" id="drawer-body"></div>
+    </div>
+
     <div class="float scenario" id="scenario">
       <h2>Scenario</h2>
+      <label class="sel" for="s-preset"><span>Published scenario</span>
+        <select id="s-preset">
+          <option value="custom">Custom (your sliders)</option>
+          <option value="steps">Stated policies</option>
+          <option value="nze">Net zero 2050</option>
+          <option value="irena">1.5 °C pathway</option>
+          <option value="atb">Cheap renewables</option>
+          <option value="shock">Fossil price shock</option>
+        </select>
+      </label>
+      <p class="src muted" id="preset-src">Move any slider to make your own.</p>
       <div class="slider"><label for="s-year">Build year</label><output id="o-year"></output><input type="range" id="s-year" min="2025" max="2050" step="1"></div>
+      <div class="slider"><label for="s-elec">Electrification of heat and transport</label><output id="o-elec"></output><input type="range" id="s-elec" min="10" max="80" step="1"></div>
+      <div class="slider"><label for="s-growth">Underlying demand growth</label><output id="o-growth"></output><input type="range" id="s-growth" min="-1" max="5" step="0.1"></div>
+      <div class="demand" id="demand"></div>
       <div class="slider"><label for="s-wacc">Cost of capital</label><output id="o-wacc"></output><input type="range" id="s-wacc" min="2" max="18" step="0.5"></div>
       <div class="slider"><label for="s-carbon">Carbon price</label><output id="o-carbon"></output><input type="range" id="s-carbon" min="0" max="200" step="5"></div>
       <div class="slider"><label for="s-gas">Gas price</label><output id="o-gas"></output><input type="range" id="s-gas" min="5" max="90" step="1"></div>
@@ -78,6 +125,18 @@
       <div id="sites"></div>
     </section>
 
+    <section data-show="tier">
+      <h2>Run a full optimisation <span class="tier ph">Layer 4 · mock run</span></h2>
+      <div id="run"></div>
+    </section>
+
+    <section data-show="best">
+      <h2>Generation mix, history and projection <span class="tier ph">illustrative</span></h2>
+      <canvas class="chart tall" id="history"></canvas>
+      <div class="readout" id="history-legend"></div>
+      <p class="note" id="history-src"></p>
+    </section>
+
     <section data-show="best">
       <h2>Technology ranking</h2>
       <ol class="rank" id="rank"></ol>
@@ -111,7 +170,10 @@
         <div><div class="lbl"><span>Construction jobs by technology</span></div><div class="stack" id="jobstack"></div></div>
         <div><div class="lbl"><span>Investment by technology</span></div><div class="stack" id="invstack"></div></div>
       </div>
-      <p class="note">The mix comes from the weighted screening ranking (see the Cheapest technology tab). Job and GDP numbers use multipliers from published studies, still to be sourced (IRENA and others). CO₂ avoided is measured against the region's current fossil baseline.</p>
+      <h2 style="margin-top:18px">Across scenarios <span class="tier ph">rough</span></h2>
+      <div class="wrap-x"><table class="scen" id="scen-table"></table></div>
+      <p class="note">Each row reruns the screening and the multipliers under that scenario, with new build set by its demand growth. Click a row to load it.</p>
+      <p class="note" id="newbuild-note">New build follows demand growth plus replacing 30% of today's fleet. Move the slider to override it. The mix comes from the weighted screening ranking (see the Cheapest technology tab). Job and GDP numbers use multipliers from published studies, still to be sourced (IRENA and others). CO₂ avoided is measured against the region's current fossil baseline.</p>
     </section>
 
     <section data-show="tier none">
@@ -132,6 +194,8 @@
 <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
-<script src="app.js?v=4"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="city.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
